@@ -2,6 +2,8 @@
 
 A premium, multi-format desktop authoring environment for technical writers and editorial teams, built with React, Tailwind CSS, and Framer Motion.
 
+> Deplyment live at [https://pro-md.vercel.app/](https://pro-md.vercel.app/)
+
 ## Features
 
 - **The Digital Archivist Design System**: A bespoke aesthetic balancing print heritage with digital precision.
