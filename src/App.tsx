@@ -260,6 +260,21 @@ export default function App() {
         {content.trim().split(/\s+/).length} words
       </div>
 
+      {/* Footer */}
+      <footer className={cn(
+        "fixed bottom-0 left-0 w-full py-2 px-6 bg-surface/50 backdrop-blur-sm border-t border-outline-variant z-30 flex flex-col md:flex-row items-center justify-between text-[10px] text-muted font-heading transition-opacity duration-500",
+        viewMode === 'zen' && isTyping && "opacity-0 pointer-events-none"
+      )}>
+        <div className="flex items-center gap-2">
+          <span>© 2026 Prashant Fawade. All rights reserved.</span>
+          <span className="hidden md:inline text-outline-variant">|</span>
+          <span className="italic">Pro Markdown Editor</span>
+        </div>
+        <div className="mt-1 md:mt-0 opacity-60">
+          Disclaimer: This website was created with the assistance of AI.
+        </div>
+      </footer>
+
       {/* Command Palette */}
       <AnimatePresence>
         {isCommandPaletteOpen && (
