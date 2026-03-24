@@ -3,12 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  ArrowLeft, 
-  MoreVertical, 
-  Settings, 
   Search, 
   Bold, 
   Italic, 
@@ -18,21 +15,20 @@ import {
   Quote, 
   Download, 
   FileCode, 
-  Info,
-  Rocket,
   X,
-  Command,
-  ChevronRight,
-  Palette,
   Sun,
   Moon,
   Leaf,
-  Flower2
+  Flower2,
+  FileText,
+  Undo,
+  Redo,
+  Info
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from './lib/utils';
 
-type ViewMode = 'zen' | 'split';
+type ViewMode = 'write' | 'preview' | 'split';
 type Theme = 'default' | 'archive' | 'sage' | 'rose';
 
 const INITIAL_CONTENT = `# The Art of Distraction-Free Writing
@@ -66,14 +62,71 @@ function focus() {
 Start typing...`;
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<ViewMode>('zen');
+  const [viewMode, setViewMode] = useState<ViewMode>('write');
   const [theme, setTheme] = useState<Theme>('default');
   const [content, setContent] = useState(INITIAL_CONTENT);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isMetadataOpen, setIsMetadataOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [selection, setSelection] = useState<{ top: number; left: number; text: string } | null>(null);
+  const [showPrintWarning, setShowPrintWarning] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // History State for Undo/Redo
+  const historyRef = useRef<string[]>([INITIAL_CONTENT]);
+  const historyIndexRef = useRef<number>(0);
+
+  const pushHistory = useCallback((newContent: string) => {
+    const currentHistory = historyRef.current;
+    const currentIndex = historyIndexRef.current;
+    if (currentHistory[currentIndex] === newContent) return;
+
+    const newHistory = currentHistory.slice(0, currentIndex + 1);
+    newHistory.push(newContent);
+    historyRef.current = newHistory;
+    historyIndexRef.current = newHistory.length - 1;
+  }, []);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      historyIndexRef.current -= 1;
+      setContent(historyRef.current[historyIndexRef.current]);
+    }
+  }, []);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      historyIndexRef.current += 1;
+      setContent(historyRef.current[historyIndexRef.current]);
+    }
+  }, []);
+
+  // Debounce pushing to history
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      pushHistory(content);
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [content, pushHistory]);
+
+  // Keyboard shortcuts for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   // Apply theme to document
   useEffect(() => {
@@ -89,7 +142,6 @@ export default function App() {
       }
       if (e.key === 'Escape') {
         setIsCommandPaletteOpen(false);
-        setIsMetadataOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -102,6 +154,28 @@ export default function App() {
     setIsTyping(true);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
+  };
+
+  const handleExport = () => {
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'document.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    // Check if we are inside an iframe (like the AI Studio preview)
+    if (window.self !== window.top) {
+      setShowPrintWarning(true);
+      setTimeout(() => setShowPrintWarning(false), 6000);
+      return;
+    }
+    window.print();
   };
 
   // Handle text selection for floating toolbar
@@ -125,22 +199,14 @@ export default function App() {
       {/* Top Toolbar */}
       <header 
         className={cn(
-          "fixed top-0 left-0 w-full h-12 bg-surface/80 backdrop-blur-md z-40 transition-opacity duration-500 flex items-center justify-between px-6",
-          viewMode === 'zen' && isTyping && "opacity-0 pointer-events-none"
+          "fixed top-0 left-0 w-full h-12 bg-surface/80 backdrop-blur-md z-40 transition-opacity duration-500 flex items-center justify-between px-6 print:hidden",
+          (viewMode === 'write' || viewMode === 'preview') && isTyping && "opacity-0 pointer-events-none"
         )}
       >
         <div className="flex items-center gap-4">
-          <button className="text-muted hover:text-text transition-colors">
-            <ArrowLeft size={18} />
-          </button>
-          <div className="flex items-center gap-2 text-xs font-heading font-medium">
-            <span className="text-text">Untitled Document</span>
-            <span className="text-muted">Unsaved changes</span>
+          <div className="text-[13px] font-heading font-medium tracking-wide hidden md:block">
+            The Art of Distraction-Free Writing
           </div>
-        </div>
-
-        <div className="absolute left-1/2 -translate-x-1/2 text-[13px] font-heading font-medium tracking-wide hidden md:block">
-          The Art of Distraction-Free Writing
         </div>
 
         <div className="flex items-center gap-3">
@@ -154,13 +220,22 @@ export default function App() {
 
           <div className="flex items-center bg-surface-low rounded-full p-1">
             <button 
-              onClick={() => setViewMode('zen')}
+              onClick={() => setViewMode('write')}
               className={cn(
                 "px-4 py-1 rounded-full text-[11px] font-heading font-semibold transition-all",
-                viewMode === 'zen' ? "bg-surface-lowest shadow-sm text-text" : "text-muted hover:text-text"
+                viewMode === 'write' ? "bg-surface-lowest shadow-sm text-text" : "text-muted hover:text-text"
               )}
             >
-              Zen
+              Write
+            </button>
+            <button 
+              onClick={() => setViewMode('preview')}
+              className={cn(
+                "px-4 py-1 rounded-full text-[11px] font-heading font-semibold transition-all",
+                viewMode === 'preview' ? "bg-surface-lowest shadow-sm text-text" : "text-muted hover:text-text"
+              )}
+            >
+              Preview
             </button>
             <button 
               onClick={() => setViewMode('split')}
@@ -173,20 +248,28 @@ export default function App() {
             </button>
           </div>
           <button 
-            onClick={() => setIsMetadataOpen(true)}
+            onClick={handleExport}
             className="text-muted hover:text-text transition-colors p-1"
+            title="Export Markdown"
           >
-            <Settings size={18} />
+            <Download size={18} />
+          </button>
+          <button 
+            onClick={handleExportPDF}
+            className="text-muted hover:text-text transition-colors p-1"
+            title="Export PDF"
+          >
+            <FileText size={18} />
           </button>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="pt-12 h-screen overflow-hidden">
+      <main className="pt-12 h-screen overflow-hidden print:hidden">
         <AnimatePresence mode="wait">
-          {viewMode === 'zen' ? (
+          {viewMode === 'write' ? (
             <motion.div 
-              key="zen"
+              key="write"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -220,6 +303,18 @@ export default function App() {
                     <ToolbarButton icon={<Quote size={16} />} label="Quote" />
                   </motion.div>
                 )}
+              </div>
+            </motion.div>
+          ) : viewMode === 'preview' ? (
+            <motion.div 
+              key="preview"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="h-full overflow-y-auto px-6 py-20 flex justify-center"
+            >
+              <div className="w-full max-w-[720px] prose">
+                <ReactMarkdown>{content}</ReactMarkdown>
               </div>
             </motion.div>
           ) : (
@@ -256,14 +351,14 @@ export default function App() {
       </main>
 
       {/* Word Count Indicator */}
-      <div className="fixed bottom-6 right-8 text-muted text-[12px] font-heading font-medium z-40 bg-surface/80 px-2 py-1 rounded">
+      <div className="fixed bottom-6 right-8 text-muted text-[12px] font-heading font-medium z-40 bg-surface/80 px-2 py-1 rounded print:hidden">
         {content.trim().split(/\s+/).length} words
       </div>
 
       {/* Footer */}
       <footer className={cn(
-        "fixed bottom-0 left-0 w-full py-2 px-6 bg-surface/50 backdrop-blur-sm border-t border-outline-variant z-30 flex flex-col md:flex-row items-center justify-between text-[10px] text-muted font-heading transition-opacity duration-500",
-        viewMode === 'zen' && isTyping && "opacity-0 pointer-events-none"
+        "fixed bottom-0 left-0 w-full py-2 px-6 bg-surface/50 backdrop-blur-sm border-t border-outline-variant z-30 flex flex-col md:flex-row items-center justify-between text-[10px] text-muted font-heading transition-opacity duration-500 print:hidden",
+        (viewMode === 'write' || viewMode === 'preview') && isTyping && "opacity-0 pointer-events-none"
       )}>
         <div className="flex items-center gap-2">
           <span>© 2026 Prashant Fawade. All rights reserved.</span>
@@ -301,13 +396,12 @@ export default function App() {
                 />
               </div>
               <div className="p-2">
-                <div className="px-4 py-2 text-[11px] font-heading font-semibold text-muted uppercase tracking-wider">Recent Actions</div>
-                <CommandItem icon={<Search size={16} />} label="Toggle Split View" shortcut="⌘S" />
-                <CommandItem icon={<Search size={16} />} label="Enable Zen Focus" shortcut="⌘⇧Z" />
+                <div className="px-4 py-2 text-[11px] font-heading font-semibold text-muted uppercase tracking-wider">Editor Actions</div>
+                <CommandItem icon={<Undo size={16} />} label="Undo" shortcut="⌘Z" onClick={() => { undo(); setIsCommandPaletteOpen(false); }} />
+                <CommandItem icon={<Redo size={16} />} label="Redo" shortcut="⌘⇧Z" onClick={() => { redo(); setIsCommandPaletteOpen(false); }} />
                 <div className="px-4 py-2 text-[11px] font-heading font-semibold text-muted uppercase tracking-wider mt-2">Document</div>
-                <CommandItem icon={<Info size={16} />} label="Document Metadata" shortcut="⌘M" />
-                <CommandItem icon={<Download size={16} />} label="Export to Markdown" shortcut="⌘E" />
-                <CommandItem icon={<FileCode size={16} />} label="Export to HTML" />
+                <CommandItem icon={<Download size={16} />} label="Export to Markdown" onClick={() => { handleExport(); setIsCommandPaletteOpen(false); }} />
+                <CommandItem icon={<FileText size={16} />} label="Export to PDF" onClick={() => { handleExportPDF(); setIsCommandPaletteOpen(false); }} />
               </div>
               <div className="bg-surface-low/50 border-t border-outline-variant px-4 py-2 flex items-center justify-between text-muted font-heading text-[11px]">
                 <div className="flex items-center gap-3">
@@ -321,76 +415,31 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Metadata Drawer */}
+      {/* Print/PDF Container */}
+      <div className="hidden print:block p-8 prose max-w-none w-full bg-surface text-text">
+        <ReactMarkdown>{content}</ReactMarkdown>
+      </div>
+
+      {/* Iframe Print Warning Toast */}
       <AnimatePresence>
-        {isMetadataOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMetadataOpen(false)}
-              className="fixed inset-0 bg-primary/5 z-[60]"
-            />
-            <motion.aside 
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-[320px] bg-surface-lowest shadow-2xl z-[70] border-l border-outline-variant flex flex-col"
-            >
-              <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant">
-                <h2 className="font-heading text-[15px] font-semibold">Document Settings</h2>
-                <button onClick={() => setIsMetadataOpen(false)} className="text-muted hover:text-text">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                <div className="space-y-2">
-                  <span className="block text-[11px] font-heading font-semibold text-muted uppercase tracking-wider">Status</span>
-                  <div className="flex items-center gap-2 text-[13px] font-heading">
-                    <div className="w-2 h-2 rounded-full bg-accent" />
-                    Draft - Last saved 2 mins ago
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="block text-[13px] font-heading font-medium">URL Slug</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-[13px]">/</span>
-                    <input 
-                      defaultValue="the-art-of-distraction-free-writing"
-                      className="w-full pl-6 pr-3 py-2 bg-surface-low border-transparent rounded-md text-[13px] font-heading focus:bg-surface-lowest focus:ring-1 focus:ring-accent transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-[13px] font-heading font-medium">Tags</label>
-                  <div className="flex flex-wrap gap-2 p-2 bg-surface-low border-transparent rounded-md min-h-[80px] focus-within:bg-surface-lowest focus-within:ring-1 focus-within:ring-accent transition-all">
-                    <Tag label="Editorial" />
-                    <Tag label="Design" />
-                    <input className="bg-transparent border-none focus:ring-0 text-[13px] flex-1 min-w-[60px]" placeholder="Add a tag..." />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-[13px] font-heading font-medium text-muted">Search Description</label>
-                  <textarea 
-                    rows={4}
-                    placeholder="Brief description for search engines..."
-                    className="w-full p-3 bg-surface-low border-transparent rounded-md text-[13px] font-heading focus:bg-surface-lowest focus:ring-1 focus:ring-accent transition-all resize-none"
-                  />
-                </div>
-              </div>
-              <div className="p-6 border-t border-outline-variant">
-                <button className="w-full h-11 cta-gradient text-surface-lowest font-heading text-[14px] font-semibold rounded-md flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-lg">
-                  <Rocket size={18} />
-                  Publish Document
-                </button>
-              </div>
-            </motion.aside>
-          </>
+        {showPrintWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 50, x: '-50%' }}
+            className="fixed bottom-24 left-1/2 z-50 bg-surface-lowest border border-outline-variant shadow-2xl rounded-lg p-4 flex items-start gap-3 max-w-md w-[90%]"
+          >
+            <Info className="text-accent shrink-0 mt-0.5" size={18} />
+            <div>
+              <h4 className="text-[13px] font-heading font-semibold text-text mb-1">Print Disabled in Preview</h4>
+              <p className="text-[12px] font-body text-muted leading-relaxed">
+                To export a high-quality PDF with selectable text, please open this app in a new tab using the <strong className="text-text">Open in New Tab</strong> button at the top right of the AI Studio preview.
+              </p>
+            </div>
+            <button onClick={() => setShowPrintWarning(false)} className="text-muted hover:text-text ml-2 shrink-0">
+              <X size={16} />
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -405,9 +454,9 @@ function ToolbarButton({ icon, label }: { icon: React.ReactNode; label: string }
   );
 }
 
-function CommandItem({ icon, label, shortcut }: { icon: React.ReactNode; label: string; shortcut?: string }) {
+function CommandItem({ icon, label, shortcut, onClick }: { icon: React.ReactNode; label: string; shortcut?: string; onClick?: () => void }) {
   return (
-    <button className="w-full flex items-center px-4 py-2.5 rounded-md hover:bg-surface-low transition-colors group">
+    <button onClick={onClick} className="w-full flex items-center px-4 py-2.5 rounded-md hover:bg-surface-low transition-colors group">
       <span className="text-muted group-hover:text-text mr-3">{icon}</span>
       <span className="flex-1 text-left text-[14px] font-heading font-medium">{label}</span>
       {shortcut && (
@@ -416,15 +465,6 @@ function CommandItem({ icon, label, shortcut }: { icon: React.ReactNode; label: 
         </span>
       )}
     </button>
-  );
-}
-
-function Tag({ label }: { label: string }) {
-  return (
-    <div className="inline-flex items-center gap-1 px-2 py-1 rounded bg-accent/20 text-text font-heading text-[12px] font-medium border border-accent/30">
-      {label}
-      <X size={12} className="cursor-pointer hover:text-highlight" />
-    </div>
   );
 }
 
