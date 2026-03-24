@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-container: var(--primary-container);
+  --color-surface: var(--surface);
+  --color-surface-low: var(--surface-low);
+  --color-surface-lowest: var(--surface-lowest);
+  --color-surface-high: var(--surface-high);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-highlight: var(--highlight);
+  --color-outline-variant: var(--outline-variant);
+
+  --font-heading: "Inter", sans-serif;
+  --font-body: "Newsreader", serif;
+  --font-code: "JetBrains Mono", monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --shadow-diffuse: 0 8px 30px rgba(0, 0, 0, 0.04);
+  --shadow-ambient: 0px 4px 20px rgba(28, 28, 26, 0.04), 0px 10px 40px rgba(28, 28, 26, 0.02);
+}
+
+@layer base {
+  :root {
+    /* Theme 1: Alabaster & Charcoal (Default) */
+    --surface: #faf9f7;
+    --surface-low: #f4f3f1;
+    --surface-lowest: #ffffff;
+    --surface-high: #e9e8e6;
+    --primary: #010100;
+    --primary-container: #1c1c1a;
+    --text: #1a1c1b;
+    --muted: #8e8d8a;
+    --accent: #b5c2b7;
+    --highlight: #dda7a5;
+    --outline-variant: rgba(28, 28, 26, 0.15);
+  }
+
+  [data-theme="archive"] {
+    --surface: #141412;
+    --surface-low: #1c1c1a;
+    --surface-lowest: #2a2a28;
+    --surface-high: #0a0a09;
+    --primary: #faf9f7;
+    --primary-container: #e9e8e6;
+    --text: #f4f3f1;
+    --muted: #8e8d8a;
+    --accent: #556158;
+    --highlight: #8a5e5c;
+    --outline-variant: rgba(250, 249, 247, 0.15);
+  }
+
+  [data-theme="sage"] {
+    --surface: #f5f7f5;
+    --surface-low: #edf0ed;
+    --surface-lowest: #ffffff;
+    --surface-high: #e4e9e4;
+    --primary: #556158;
+    --primary-container: #6d7c71;
+    --text: #2c332e;
+    --muted: #8e9a91;
+    --accent: #b5c2b7;
+    --highlight: #dda7a5;
+    --outline-variant: rgba(85, 97, 88, 0.15);
+  }
+
+  [data-theme="rose"] {
+    --surface: #fcf9f9;
+    --surface-low: #f9f2f2;
+    --surface-lowest: #ffffff;
+    --surface-high: #f4e6e6;
+    --primary: #8a5e5c;
+    --primary-container: #a67b79;
+    --text: #3d2b2a;
+    --muted: #9e8a89;
+    --accent: #dda7a5;
+    --highlight: #b5c2b7;
+    --outline-variant: rgba(138, 94, 92, 0.15);
+  }
+
+  body {
+    @apply bg-surface text-text font-body antialiased transition-colors duration-300;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight text-text;
+  }
+
+  /* Markdown Styling */
+  .prose {
+    @apply max-w-none text-text font-body;
+  }
+  .prose h1 { @apply text-5xl font-bold mb-10 mt-6 font-heading tracking-tighter; }
+  .prose h2 { @apply text-3xl font-semibold mb-8 mt-16 font-heading tracking-tight; }
+  .prose h3 { @apply text-xl font-semibold mb-4 mt-10 font-heading uppercase tracking-widest text-muted; }
+  .prose p { @apply text-[19px] leading-[1.7] mb-8 font-body; }
+  .prose strong { @apply font-bold text-primary; }
+  .prose em { @apply italic; }
+  .prose blockquote { 
+    @apply border-l-[6px] pl-8 my-12 italic text-2xl font-body leading-relaxed;
+    border-color: var(--highlight);
+    color: var(--accent);
+  }
+  .prose ul { @apply list-disc pl-8 mb-8 space-y-3; }
+  .prose ol { @apply list-decimal pl-8 mb-8 space-y-3; }
+  .prose li { @apply text-lg; }
+  .prose code { @apply font-code text-[14px] bg-surface-low px-2 py-0.5 rounded text-primary; }
+  .prose pre { @apply bg-surface-low p-8 rounded-lg overflow-x-auto mb-10 font-code text-[14px] shadow-inner; }
+  .prose a { @apply text-primary font-medium underline decoration-highlight underline-offset-4 hover:decoration-primary transition-all; }
+  .prose hr { @apply border-t border-outline-variant my-16; }
+  .prose img { @apply rounded-lg shadow-ambient my-12 mx-auto; }
+}
+
+/* Glassmorphism */
+.glass {
+  @apply bg-surface-lowest/80 backdrop-blur-[20px] border border-outline-variant;
+}
+
+/* CTA Gradient */
+.cta-gradient {
+  background: linear-gradient(45deg, var(--primary), var(--primary-container));
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-outline-variant rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
